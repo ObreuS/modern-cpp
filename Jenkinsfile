@@ -75,6 +75,10 @@ pipeline {
         }
 
         stage('Sanitizer Build') {
+            when {
+                branch 'main'
+            }
+        
             steps {
                 dir('market-data-service') {
                     sh '''
@@ -87,38 +91,56 @@ pipeline {
         }
         
         stage('Approval Gate') {
+            when {
+                branch 'main'
+            }
+        
             steps {
                 input 'CI passed. Approve Docker build?'
             }
         }
+        
         stage('Docker Build') {
+            when {
+                branch 'main'
+            }
+        
             steps {
                 dir('market-data-service') {
                     sh '''
-                    docker build -t $FULL_IMAGE .
+                        docker build -t $FULL_IMAGE .
                     '''
                 }
             }
         }
-       stage('Security Scan - Trivy') {
-        steps {
-            sh '''
-                trivy image \
-                  --severity HIGH,CRITICAL \
-                  --exit-code 0 \
-                  --no-progress \
-                  $FULL_IMAGE
-                 '''
-    }
-}
+        
+        stage('Security Scan - Trivy') {
+            when {
+                branch 'main'
+            }
+        
+            steps {
+                sh '''
+                    trivy image \
+                      --severity HIGH,CRITICAL \
+                      --exit-code 0 \
+                      --no-progress \
+                      $FULL_IMAGE
+                '''
+            }
+        }
+
         stage('Push Image to Private Registry') {
-    steps {
-        sh '''
-            docker push $FULL_IMAGE
-        '''
-    }
-}
-    }
+            when {
+                branch 'main'
+            }
+        
+            steps {
+                sh '''
+                    docker push $FULL_IMAGE
+                '''
+            }
+        }
 
     post {
         success {
