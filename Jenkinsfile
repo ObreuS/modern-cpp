@@ -1,6 +1,14 @@
 pipeline {
     agent any
 
+     environment {
+        REGISTRY = 'localhost:5000'
+        APP_NAME = 'market-data-service'
+        IMAGE_TAG = "${BUILD_NUMBER}"
+        FULL_IMAGE = "${REGISTRY}/${APP_NAME}:v${IMAGE_TAG}"
+    }
+
+
     options {
         timestamps()
     }
@@ -77,11 +85,27 @@ pipeline {
                 }
             }
         }
+        
+        stage('Approval Gate') {
+            steps {
+                input 'CI passed. Approve Docker build?'
+            }
+        }
+                stage('Docker Build') {
+
+            steps {
+                dir('market-data-service') {
+                    sh '''
+                    docker build -t $FULL_IMAGE .
+                    '''
+                }
+            }
+        }
     }
 
     post {
         success {
-            echo 'Modern C++ CI pipeline completed successfully.'
+            echo 'completed successfully.'
         }
 
         failure {
