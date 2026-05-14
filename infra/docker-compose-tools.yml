@@ -1,0 +1,11 @@
+version: "3.8"
+services:
+  sonarqube:
+    image: sonarqube:community
+    ports:
+      - "9000:9000"
+
+  registry:
+    image: registry:2
+    ports:
+      - "5000:5000"

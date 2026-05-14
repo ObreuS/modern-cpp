@@ -1,0 +1,98 @@
+pipeline {
+    agent { label 'modern-cpp-docker-agent' }
+
+    environment {
+        APP_NAME = 'market-data-service'
+        REGISTRY = 'registry.company.internal/platform'
+        IMAGE_TAG = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Configure Release') {
+            steps {
+                sh 'cmake --preset release'
+            }
+        }
+
+        stage('Build Release') {
+            steps {
+                sh 'cmake --build --preset release'
+            }
+        }
+
+        stage('Unit Tests') {
+            steps {
+                sh 'ctest --preset release'
+            }
+        }
+
+        stage('Static Analysis') {
+            steps {
+                sh 'clang-format --dry-run --Werror $(find src include tests -name "*.cpp" -o -name "*.h")'
+                sh 'cppcheck --enable=warning,performance,portability src include || true'
+                sh 'clang-tidy src/**/*.cpp -- -Iinclude || true'
+            }
+        }
+
+        stage('Sanitizer Build') {
+            steps {
+                sh 'cmake --preset asan'
+                sh 'cmake --build --preset asan'
+                sh 'ctest --preset asan'
+            }
+        }
+
+        stage('SonarQube') {
+            steps {
+                sh 'sonar-scanner || true'
+            }
+        }
+
+        stage('Docker Build') {
+            steps {
+                sh 'docker build -t $REGISTRY/$APP_NAME:$IMAGE_TAG .'
+            }
+        }
+
+        stage('Image Security Scan') {
+            steps {
+                sh 'trivy image --exit-code 0 --severity HIGH,CRITICAL $REGISTRY/$APP_NAME:$IMAGE_TAG'
+            }
+        }
+
+        stage('Push Image') {
+            steps {
+                sh 'docker push $REGISTRY/$APP_NAME:$IMAGE_TAG'
+            }
+        }
+
+        stage('Deploy DEV') {
+            steps {
+                sh 'helm upgrade --install $APP_NAME ./helm/market-data-service --namespace dev --create-namespace --set image.repository=$REGISTRY/$APP_NAME --set image.tag=$IMAGE_TAG'
+            }
+        }
+
+        stage('Promote PROD') {
+            when { branch 'main' }
+            steps {
+                input 'Deploy to PROD?'
+                sh 'helm upgrade --install $APP_NAME ./helm/market-data-service --namespace prod --create-namespace --set image.repository=$REGISTRY/$APP_NAME --set image.tag=$IMAGE_TAG'
+            }
+        }
+    }
+
+    post {
+        failure {
+            echo 'Notify Slack/Teams: pipeline failed'
+        }
+        success {
+            echo 'Pipeline completed successfully'
+        }
+    }
+}

@@ -1,0 +1,24 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: market-data-service-dev
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://git.company.internal/platform/market-data-service.git
+    targetRevision: main
+    path: helm/market-data-service
+    helm:
+      valueFiles:
+        - values.yaml
+      parameters:
+        - name: image.tag
+          value: latest
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
