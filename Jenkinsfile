@@ -91,8 +91,7 @@ pipeline {
                 input 'CI passed. Approve Docker build?'
             }
         }
-                stage('Docker Build') {
-
+        stage('Docker Build') {
             steps {
                 dir('market-data-service') {
                     sh '''
@@ -101,6 +100,17 @@ pipeline {
                 }
             }
         }
+       stage('Security Scan - Trivy') {
+        steps {
+            sh '''
+                trivy image \
+                  --severity HIGH,CRITICAL \
+                  --exit-code 1 \
+                  --no-progress \
+                  $FULL_IMAGE
+                 '''
+    }
+}
     }
 
     post {
