@@ -111,6 +111,13 @@ pipeline {
                  '''
     }
 }
+        stage('Push Image to Private Registry') {
+    steps {
+        sh '''
+            docker push $FULL_IMAGE
+        '''
+    }
+}
     }
 
     post {
